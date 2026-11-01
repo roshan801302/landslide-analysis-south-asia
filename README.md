@@ -13,7 +13,7 @@
 
 **A narrative survey of machine-learning approaches to landslide studies, paired with a reproducible experiment in event classification and coordinate clustering.**
 
-[Survey article](LANDSLIDE_ML_SURVEY.md) · [Experiment](#-illustrative-experiment) · [Workflow](#-analysis-workflow) · [Quick start](#-quick-start) · [Limitations](#-important-limitations)
+[PDF report](Landslide_ML_Survey_Report.pdf) · [Survey article](LANDSLIDE_ML_SURVEY.md) · [Experiment](#-illustrative-experiment) · [Workflow](#-analysis-workflow) · [Quick start](#-quick-start) · [Limitations](#-important-limitations)
 
 </div>
 
@@ -289,6 +289,7 @@ Running the script from the project directory creates or updates:
 
 | Output | Description |
 | --- | --- |
+| `Landslide_ML_Survey_Report.pdf` | Illustrated survey and experiment report, formatted as a two-column research article |
 | `landslide_monthly_forecast.png` | Monthly catalog counts, holdout baseline, and historical seasonal-average projection for future dates |
 | `landslide_monthly_forecast.csv` | Future 12-month historical seasonal-mean projections, with latest data month and method |
 | `landslide_seasonal_country_clusters.png` | Heatmap of country-level seasonal event shares |
@@ -334,6 +335,7 @@ To use the real-data path, place `Global_Landslide_Catalog_Export_rows.csv` in t
 ├── run_landslide_analysis.py          # Analysis pipeline
 ├── Global_Landslide_Catalog_Export_rows.csv  # Optional input dataset
 ├── LANDSLIDE_ML_SURVEY.md             # Focused ML survey and illustrative experiment
+├── Landslide_ML_Survey_Report.pdf     # Illustrated, print-ready research report
 ├── processed_landslide_data.csv       # Generated processed data
 ├── landslide_monthly_forecast.csv     # Generated seasonal-baseline forecast
 ├── country_seasonal_clusters.csv      # Generated country seasonal profiles
