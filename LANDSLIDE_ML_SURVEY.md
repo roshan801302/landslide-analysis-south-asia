@@ -1,4 +1,4 @@
-# Machine Learning for Landslide Studies: A Focused Survey and South Asian Illustrative Experiment
+# A Focused Survey and South Asian Illustrative Experiment
 
 ## Abstract
 
