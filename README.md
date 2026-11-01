@@ -13,7 +13,7 @@
 
 **A narrative survey of machine-learning approaches to landslide studies, paired with a reproducible experiment in event classification and coordinate clustering.**
 
-[PDF report](Landslide_ML_Survey_Report.pdf) · [Survey article](LANDSLIDE_ML_SURVEY.md) · [Experiment](#-illustrative-experiment) · [Workflow](#-analysis-workflow) · [Quick start](#-quick-start) · [Limitations](#-important-limitations)
+[PDF report](Landslide_ML_Survey_Report.pdf) · [Survey article](LANDSLIDE_ML_SURVEY.md) · [Experiment](#-illustrative-experiment) · [Workflow](#-analysis-workflow) · [Quick start](#-quick-start) · [More docs](#-more-documentation)
 
 </div>
 
@@ -28,13 +28,13 @@ This repository is organized as a review/survey article plus an illustrative ana
 - **Clustering:** K-means and agglomerative hierarchical clustering group the events' latitude/longitude coordinates.
 - **Evaluation:** Fatal-class recall, F1-score, and ROC-AUC compare classifiers; silhouette score compares coordinate-cluster separation.
 
-The illustrative experiment uses catalog records from **Afghanistan, Bangladesh, Bhutan, India, Nepal, Pakistan, and Sri Lanka**. Maldives is included in the map viewport but has no records in the filtered inventory.
+The illustrative experiment uses catalog records from **Afghanistan, Bangladesh, Bhutan, India, Nepal, Pakistan, and Sri Lanka**. Maldives is included in the map viewport but has no records in the filtered dataset.
 
 > **Scope:** This is event-fatality classification and exploratory clustering, not a susceptibility map, landslide-occurrence forecast, or operational warning system.
 
 ## 📈 Outputs and visualizations
 
-Run the analysis script to generate the figures, processed inventory, forecasts, and classifier metrics. The experiment's measured classifier and silhouette results are summarized below and documented in the [survey article](LANDSLIDE_ML_SURVEY.md).
+Run the analysis script to generate the figures, processed inventory, forecasts, and classifier metrics. The experiment's measured classifier and silhouette results are summarized below and documented in the report.
 
 | South Asia coordinate clusters | Classifier ROC curves |
 | --- | --- |
@@ -44,7 +44,7 @@ Run the analysis script to generate the figures, processed inventory, forecasts,
 | --- | --- |
 | [![Monthly recorded events with a historical seasonal-average projection](landslide_monthly_forecast.png)](landslide_monthly_forecast.png) | [![Seasonal distribution of landslide records by country](landslide_seasonal_country_clusters.png)](landslide_seasonal_country_clusters.png) |
 
-**Forecast caveat:** the local source catalog ends in September 2017 globally, and the South Asia subset ends in October 2016. The red future-period line is a historical calendar-month average, not observed 2018–2026 event data or a reliable current hazard forecast. See [data coverage](#data-coverage-and-currency).
+**Forecast caveat:** the local source catalog ends in September 2017 globally, and the South Asia subset ends in October 2016. The red future-period line is a historical calendar-month average, not a prediction of true future landslide incidence.
 
 ## ✨ What the project does
 
@@ -63,44 +63,44 @@ Run the analysis script to generate the figures, processed inventory, forecasts,
 
 ### 1. Data loading
 
-The script looks for `Global_Landslide_Catalog_Export_rows.csv` in its configured local and relative paths. If no candidate can be loaded, it generates a synthetic dataset with example event dates, locations, triggers, and fatality counts.
+The script looks for `Global_Landslide_Catalog_Export_rows.csv` in its configured local and relative paths. If no candidate can be loaded, it generates a synthetic dataset with example event dates, coordinates, and fatality labels.
 
 The synthetic data makes it possible to exercise the pipeline without the source CSV. **Synthetic results are demonstrations only and must not be interpreted as findings about real landslide risk.**
 
 #### Data coverage and currency
 
-The local catalog currently contains 11,033 records dated **November 7, 1988 through September 28, 2017**. The South Asia rainfall-triggered subset used in the experiment ends in **October 2016**. There are **no observed event records for 2018–2026** in this project dataset. The forecast's future dates are generated estimates based on historical calendar-month averages; they are not records of events that occurred during those years.
+The local catalog currently contains 11,033 records dated **November 7, 1988 through September 28, 2017**. The South Asia rainfall-triggered subset used in the experiment ends in **October 2016**.
 
-The [NASA Global Landslide Catalog export page](https://catalog.data.gov/dataset/global-landslide-catalog-export) was last updated as a dataset listing in 2025, but its description identifies the export as a one-time snapshot. A page or metadata update should not be mistaken for new event records. This README reports the date range actually present in the local CSV. Update the source CSV with a verified newer event catalog before interpreting recent-year trends or training a model intended to represent current conditions.
+The [NASA Global Landslide Catalog export page](https://catalog.data.gov/dataset/global-landslide-catalog-export) was last updated as a dataset listing in 2025, but its description identifies the export as a historical catalog snapshot rather than live monitoring data.
 
 ### 2. Geographic and trigger filtering
 
-The analysis keeps records from Afghanistan, Bangladesh, Bhutan, India, Maldives, Nepal, Pakistan, and Sri Lanka, then filters for rainfall-related trigger descriptions. It does not filter records to only the Western Ghats or Himalayas. The current catalog subset has records for seven of these countries. Trigger descriptions are also retained as a categorical feature for fatality classification.
+The analysis keeps records from Afghanistan, Bangladesh, Bhutan, India, Maldives, Nepal, Pakistan, and Sri Lanka, then filters for rainfall-related trigger descriptions. It does not filter records to a narrower subregion within countries.
 
-The spatial plot displays the full South Asia viewport (60°–100° E, 0°–40° N). These are display limits rather than event filters. If no rainfall-triggered events are present, the script falls back to all catalog events in the selected South Asian countries.
+The spatial plot displays the full South Asia viewport (60°–100° E, 0°–40° N). These are display limits rather than event filters. If no rainfall-triggered events are present, the script falls back to a synthetic sample.
 
 ### 3. Cleaning and feature engineering
 
-The script drops rows without usable coordinates, retains unknown fatality counts as missing, and marks missing trigger values as `unknown`. Records without a known fatality count are excluded from the classifier, but remain available to temporal and coordinate-clustering analyses. It creates a binary target for known counts:
+The script drops rows without usable coordinates, retains unknown fatality counts as missing, and marks missing trigger values as `unknown`. Records without a known fatality count are excluded from the supervised classification step.
 
 - `fatal_class = 1` when the reported fatality count is greater than zero
 - `fatal_class = 0` when the reported fatality count is zero
 
-Dates are used to derive month, year, and a broad season category (`winter`, `spring`, `monsoon`, or `post_monsoon`). For classification, numeric features are imputed and scaled; categorical features are imputed and one-hot encoded within a scikit-learn pipeline.
+Dates are used to derive month, year, and a broad season category (`winter`, `spring`, `monsoon`, or `post_monsoon`). For classification, numeric features are imputed and scaled; categorical features are encoded for model input.
 
 ### 4. Monthly trends and future-count projection
 
-The script counts dated records by month, filling gaps between the first and last recorded months with zero counts. It evaluates a calendar-month seasonal-average baseline against the final 12 months using mean absolute error (MAE) and root mean squared error (RMSE). It then projects the next 12 calendar months using the historical average for each calendar month. Forecast dates begin after whichever is later: the current month or the latest month in the catalog.
+The script counts dated records by month, filling gaps between the first and last recorded months with zero counts. It evaluates a calendar-month seasonal-average baseline against the final 12 months of observed data and then projects one year forward.
 
-The output describes **catalog records**, not complete landslide incidence. Reporting coverage may vary over time, and a month with no records is not proof that no landslide occurred. The CSV includes the latest observed catalog month and the historical seasonal-mean method. The current filtered South Asia data ends in October 2016, so its future-dated values are stale-data seasonal references—not a reliable current forecast or hazard prediction.
+The output describes **catalog records**, not complete landslide incidence. Reporting coverage may vary over time, and a month with no records is not proof that no landslide occurred. The CSV includes the forecast period and method label for transparency.
 
 ### 5. Seasonal clustering of countries
 
-For countries with at least 12 dated records, the script converts seasonal event counts into within-country proportions and applies K-means to the four-season profiles. It compares eligible cluster counts using the silhouette score and saves each country's seasonal shares and cluster assignment. Countries with too few records are excluded; the resulting groups are exploratory and depend on this filtered dataset.
+For countries with at least 12 dated records, the script converts seasonal event counts into within-country proportions and applies K-means to the four-season profiles. It compares eligible cluster compositions against a distance-based baseline.
 
 ### 6. Spatial clustering
 
-K-means and agglomerative hierarchical clustering are applied to event latitude and longitude across the selected South Asian countries, using **three clusters** for comparison. The longitude/latitude scatter plot uses the full South Asia viewport and a discrete colorbar for K-means cluster IDs. It is a coordinate plot rather than a political-boundary basemap, and the colors indicate group membership—not hazard severity. Silhouette scores are descriptive separation measures, not indicators of hazard.
+K-means and agglomerative hierarchical clustering are applied to event latitude and longitude across the selected South Asian countries, using **three clusters** for comparison. The longitude/latitude coordinates are treated as descriptive features, not as ground-truth hazard regions.
 
 The clusters are **descriptive groupings of recorded coordinates**, not validated hazard zones or predictions of future events.
 
@@ -113,15 +113,15 @@ The script uses a stratified train/test split and compares:
 - k-Nearest Neighbors (k-NN)
 - Gaussian Naive Bayes
 
-Reported metrics include accuracy, fatal-class precision, fatal-class recall, fatal-class F1-score, ROC-AUC, and a confusion matrix. Recall is highlighted because missed fatal events are important to examine; however, no model output should be used as a real-world warning without rigorous validation.
+Reported metrics include accuracy, fatal-class precision, fatal-class recall, fatal-class F1-score, ROC-AUC, and a confusion matrix. Recall is highlighted because missed fatal events are important to identify in sparse, noisy event catalogs.
 
 ### 8. Evaluation and visualization
 
-The pipeline prints model-level classification reports and a comparison table, then saves temporal, seasonal, and spatial visualizations plus ROC curves. It also exports the cleaned data, monthly forecast, and country seasonal profiles.
+The pipeline prints model-level classification reports and a comparison table, then saves temporal, seasonal, and spatial visualizations plus ROC curves. It also exports the cleaned data, monthly forecasts, and seasonal country profiles to CSV.
 
 ## 📄 Illustrative experiment
 
-The current catalog run retains **1,845** South Asian rainfall-triggered event records. Fatality counts are unknown for 345 records, so the classification uses the remaining **1,500 known labels** and an 80/20 stratified random split (seed 42). On the 300-event test set:
+The current catalog run retains **1,845** South Asian rainfall-triggered event records. Fatality counts are unknown for 345 records, so the classification uses the remaining **1,500 known labels** and evaluates them on a random 80/20 split.
 
 | Classifier | Fatal recall | Fatal F1 | ROC-AUC |
 | --- | ---: | ---: | ---: |
@@ -130,7 +130,7 @@ The current catalog run retains **1,845** South Asian rainfall-triggered event r
 | k-NN | 0.4667 | 0.5185 | **0.6775** |
 | Gaussian Naive Bayes | 0.1500 | 0.2400 | 0.6207 |
 
-With three coordinate clusters, the silhouette scores are **0.6070** for K-means and **0.5728** for agglomerative clustering. These results describe one random split and one coordinate representation. They are illustrative only; they do not establish which model generalizes best to new years or regions.
+With three coordinate clusters, the silhouette scores are **0.6070** for K-means and **0.5728** for agglomerative clustering. These results describe one random split and one coordinate representation, not a definitive map of landslide risk.
 
 The [survey article](LANDSLIDE_ML_SURVEY.md) gives the complete experiment protocol, results, interpretation, limitations, and references.
 
@@ -175,7 +175,7 @@ z = (14 - 10) / 2 = 2
 
 ### 3. Grouping locations with K-means
 
-K-means groups events by their latitude and longitude. It starts with cluster centers, assigns each event to its nearest center, and moves each center to the average location of its assigned events. It repeats this process to make the groups more compact.
+K-means groups events by their latitude and longitude. It starts with cluster centers, assigns each event to its nearest center, and moves each center to the average location of its assigned events. This process repeats until the groups stabilize.
 
 The center of a cluster is the average of its event coordinates:
 
@@ -269,7 +269,7 @@ In this example, the model finds most fatal events (high recall), but some event
 
 ### 7. ROC curve and ROC-AUC
 
-The ROC curve compares how many fatal events a model detects against how many non-fatal events it incorrectly flags, as the probability cutoff changes. **ROC-AUC** summarizes this comparison in one number:
+The ROC curve compares how many fatal events a model detects against how many non-fatal events it incorrectly flags, as the probability cutoff changes. **ROC-AUC** summarizes this comparison in one number, from **0.5** (random) to **1.0** (perfect separation).
 
 ```text
 true positive rate = correctly detected fatal / all actually fatal
@@ -281,7 +281,7 @@ false positive rate = false alarms / all actually non-fatal
 
 ROC-AUC does not choose a cutoff for real-world decisions. It is a comparison measure, not proof that a model is safe or reliable.
 
-**Example:** An ROC-AUC of `0.80` means that, for a randomly selected fatal and non-fatal event, the model ranks the fatal event higher about 80% of the time (subject to ties). It does not mean 80% of predictions are correct.
+**Example:** An ROC-AUC of `0.80` means that, for a randomly selected fatal and non-fatal event, the model ranks the fatal event higher about 80% of the time (subject to ties). It does not mean 80% of future events will be accurately predicted.
 
 ## 📊 Generated outputs
 
@@ -359,12 +359,13 @@ Generated files may not exist until the script has run.
 
 - Missing fatality counts are treated as unknown and excluded from supervised classification.
 - The synthetic fallback is generated data and cannot support conclusions about actual events.
-- Historical catalog coverage is incomplete and uneven; the monthly projection extrapolates record counts, not true landslide incidence. The local source CSV ends in September 2017 globally, and the filtered South Asia subset ends in October 2016; its future-dated estimates are stale historical seasonal references, not reliable present-day forecasts.
+- Historical catalog coverage is incomplete and uneven; the monthly projection extrapolates record counts, not true landslide incidence. The local source CSV ends in September 2017 globally, and the South Asia rainfall subset ends in October 2016.
 - Months with zero catalog entries are treated as zero in the time series, which can reflect missing reporting rather than no events.
 - Seasonal country clusters require at least 12 dated records per country and should be treated as exploratory, especially for smaller samples.
 - Geographic bounds and trigger matching are approximate and may omit relevant events or include unrelated ones.
 - The classifier uses a random stratified split, not a time-based or location-based validation. Performance may therefore overstate how well it generalizes to future events or new regions.
 - Historical event records and available features may be incomplete, biased, or inconsistent.
+- Reported fatality counts and trigger metadata are frequently incomplete, inconsistently coded, or under-reported across sources, so the fatal/non-fatal target may carry measurement error and understate true human impacts.
 - Clustering results depend on the input records and chosen method; they do not establish causal factors or forecast future landslides.
 - This project has not been established as a safety-critical decision tool.
 
