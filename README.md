@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🌧️ Landslide Risk Analysis
+# 🌧️ Machine Learning for Landslides
 
-### Mapping South Asian hotspots and exploring fatality patterns with machine learning
+### A focused survey with an illustrative South Asia experiment
 
 <p>
   <img src="https://img.shields.io/badge/Python-3.x-3776AB?logo=python&logoColor=white" alt="Python 3">
@@ -11,9 +11,9 @@
   <img src="https://img.shields.io/badge/Status-Research%20Project-555" alt="Research project">
 </p>
 
-**An end-to-end data science project for exploring landslide events across the Himalayas and Western Ghats.**
+**A narrative survey of machine-learning approaches to landslide studies, paired with a reproducible experiment in event classification and coordinate clustering.**
 
-[Overview](#-overview) · [Workflow](#-analysis-workflow) · [Visuals](#-project-visuals) · [Quick start](#-quick-start) · [Limitations](#-important-limitations)
+[Survey article](LANDSLIDE_ML_SURVEY.md) · [Experiment](#-illustrative-experiment) · [Workflow](#-analysis-workflow) · [Quick start](#-quick-start) · [Limitations](#-important-limitations)
 
 </div>
 
@@ -21,56 +21,43 @@
 
 ## 🌍 Overview
 
-This project analyzes historical landslide events in South Asia. It combines geographic filtering and data preparation with two machine learning tasks:
+This repository is organized as a review/survey article plus an illustrative analysis:
 
-- **Spatial clustering** groups event locations to help explore geographic concentrations.
-- **Fatality classification** compares models that distinguish events with reported fatalities from those without.
+- The [survey article](LANDSLIDE_ML_SURVEY.md) reviews problem framing, common ML methods, evaluation, and validation pitfalls in landslide research.
+- **Classification:** Logistic regression, decision tree, k-nearest neighbors, and Gaussian Naive Bayes classify recorded events by known fatality outcome.
+- **Clustering:** K-means and agglomerative hierarchical clustering group the events' latitude/longitude coordinates.
+- **Evaluation:** Fatal-class recall, F1-score, and ROC-AUC compare classifiers; silhouette score compares coordinate-cluster separation.
 
-The analysis focuses on **India, Nepal, Pakistan, Bangladesh, Sri Lanka, and Bhutan**, with geographic bounds emphasizing the **Himalayas** and **Western Ghats**.
+The illustrative experiment uses catalog records from **Afghanistan, Bangladesh, Bhutan, India, Nepal, Pakistan, and Sri Lanka**. Maldives is included in the map viewport but has no records in the filtered inventory.
 
-> **Use responsibly:** This is a research and educational analysis—not a validated operational early-warning or emergency-response system.
+> **Scope:** This is event-fatality classification and exploratory clustering, not a susceptibility map, landslide-occurrence forecast, or operational warning system.
 
-## 🖼️ Project visuals
+## 📈 Outputs and visualizations
 
-Sample outputs from the analysis are shown below. **Select an image to view it at full size.**
+Run the analysis script to generate the figures, processed inventory, forecasts, and classifier metrics. The experiment's measured classifier and silhouette results are summarized below and documented in the [survey article](LANDSLIDE_ML_SURVEY.md).
 
-<table>
-  <tr>
-    <td align="center" width="50%">
-      <a href="landslide_spatial_clusters.png">
-        <img src="landslide_spatial_clusters.png" width="100%" alt="K-means clustering of landslide event locations across the Western Ghats and Himalayas">
-      </a>
-    </td>
-    <td align="center" width="50%">
-      <a href="roc_curves.png">
-        <img src="roc_curves.png" width="100%" alt="ROC curves comparing four fatality classification models">
-      </a>
-    </td>
-  </tr>
-  <tr>
-    <td align="center">
-      <strong>Spatial clusters</strong><br>
-      K-means groups event coordinates. Colors indicate cluster membership, not hazard severity.
-    </td>
-    <td align="center">
-      <strong>Classifier comparison</strong><br>
-      ROC curves compare fatality classifiers across probability thresholds; the dashed line is random ranking.
-    </td>
-  </tr>
-</table>
+| South Asia coordinate clusters | Classifier ROC curves |
+| --- | --- |
+| [![Three K-means coordinate clusters across South Asia](landslide_spatial_clusters.png)](landslide_spatial_clusters.png) | [![ROC curves for fatality classifiers](roc_curves.png)](roc_curves.png) |
 
-<p align="center"><sub>These are example outputs already present in the project folder. Running the script regenerates the plots from the dataset it loads.</sub></p>
+| Monthly records and future seasonal baseline | Country seasonal profiles |
+| --- | --- |
+| [![Monthly recorded events with a historical seasonal-average projection](landslide_monthly_forecast.png)](landslide_monthly_forecast.png) | [![Seasonal distribution of landslide records by country](landslide_seasonal_country_clusters.png)](landslide_seasonal_country_clusters.png) |
+
+**Forecast caveat:** the local source catalog ends in September 2017 globally, and the South Asia subset ends in October 2016. The red future-period line is a historical calendar-month average, not observed 2018–2026 event data or a reliable current hazard forecast. See [data coverage](#data-coverage-and-currency).
 
 ## ✨ What the project does
 
 | Stage | Purpose |
 | --- | --- |
 | Load data | Read a local landslide CSV, or create synthetic sample data if it is unavailable |
-| Filter events | Focus on selected South Asian countries, rainfall-related triggers, and study-area bounds |
-| Prepare features | Handle selected missing values and derive month, year, season, and fatality class |
-| Explore hotspots | Cluster latitude/longitude coordinates and compare candidate cluster counts |
-| Compare classifiers | Train four models and report classification metrics |
-| Save results | Export processed records and create visualizations |
+| Filter events | Focus on South Asian countries and rainfall-related triggers without clipping locations to subregions |
+| Prepare features | Derive time features and exclude records with unknown fatality labels from classification |
+| Analyze time patterns | Aggregate monthly records, evaluate a seasonal baseline on a chronological holdout, and forecast 12 months |
+| Cluster seasonal profiles | Group countries by normalized winter, spring, monsoon, and post-monsoon record shares |
+| Explore coordinates | Compare K-means and agglomerative hierarchical clustering at three groups |
+| Compare classifiers | Train four models and report fatal-class recall, F1, and ROC-AUC |
+| Save results | Export processed records, forecasts, cluster profiles, and visualizations |
 
 ## 🧭 Analysis workflow
 
@@ -80,33 +67,44 @@ The script looks for `Global_Landslide_Catalog_Export_rows.csv` in its configure
 
 The synthetic data makes it possible to exercise the pipeline without the source CSV. **Synthetic results are demonstrations only and must not be interpreted as findings about real landslide risk.**
 
+#### Data coverage and currency
+
+The local catalog currently contains 11,033 records dated **November 7, 1988 through September 28, 2017**. The South Asia rainfall-triggered subset used in the experiment ends in **October 2016**. There are **no observed event records for 2018–2026** in this project dataset. The forecast's future dates are generated estimates based on historical calendar-month averages; they are not records of events that occurred during those years.
+
+The [NASA Global Landslide Catalog export page](https://catalog.data.gov/dataset/global-landslide-catalog-export) was last updated as a dataset listing in 2025, but its description identifies the export as a one-time snapshot. A page or metadata update should not be mistaken for new event records. This README reports the date range actually present in the local CSV. Update the source CSV with a verified newer event catalog before interpreting recent-year trends or training a model intended to represent current conditions.
+
 ### 2. Geographic and trigger filtering
 
-The analysis keeps records from the selected South Asian countries and looks for rainfall-related trigger descriptions. It then applies approximate bounding boxes:
+The analysis keeps records from Afghanistan, Bangladesh, Bhutan, India, Maldives, Nepal, Pakistan, and Sri Lanka, then filters for rainfall-related trigger descriptions. It does not filter records to only the Western Ghats or Himalayas. The current catalog subset has records for seven of these countries. Trigger descriptions are also retained as a categorical feature for fatality classification.
 
-| Study area | Latitude | Longitude |
-| --- | ---: | ---: |
-| Western Ghats | 8°–20° N | 72°–78° E |
-| Himalayas | 25°–36° N | 70°–95° E |
-
-These are broad filters for exploratory analysis, not precise administrative or geological boundaries. If the combined filters return no events, the script falls back to the available South Asian records.
+The spatial plot displays the full South Asia viewport (60°–100° E, 0°–40° N). These are display limits rather than event filters. If no rainfall-triggered events are present, the script falls back to all catalog events in the selected South Asian countries.
 
 ### 3. Cleaning and feature engineering
 
-The script drops rows without usable coordinates, fills missing fatality counts with zero, and marks missing trigger values as `unknown`. It creates a binary target:
+The script drops rows without usable coordinates, retains unknown fatality counts as missing, and marks missing trigger values as `unknown`. Records without a known fatality count are excluded from the classifier, but remain available to temporal and coordinate-clustering analyses. It creates a binary target for known counts:
 
 - `fatal_class = 1` when the reported fatality count is greater than zero
-- `fatal_class = 0` otherwise
+- `fatal_class = 0` when the reported fatality count is zero
 
 Dates are used to derive month, year, and a broad season category (`winter`, `spring`, `monsoon`, or `post_monsoon`). For classification, numeric features are imputed and scaled; categorical features are imputed and one-hot encoded within a scikit-learn pipeline.
 
-### 4. Spatial clustering
+### 4. Monthly trends and future-count projection
 
-K-means is applied to event latitude and longitude. Candidate cluster counts are compared using the silhouette score, which measures how closely grouped points are relative to neighboring groups. A scatter plot shows event clusters and their centers.
+The script counts dated records by month, filling gaps between the first and last recorded months with zero counts. It evaluates a calendar-month seasonal-average baseline against the final 12 months using mean absolute error (MAE) and root mean squared error (RMSE). It then projects the next 12 calendar months using the historical average for each calendar month. Forecast dates begin after whichever is later: the current month or the latest month in the catalog.
+
+The output describes **catalog records**, not complete landslide incidence. Reporting coverage may vary over time, and a month with no records is not proof that no landslide occurred. The CSV includes the latest observed catalog month and the historical seasonal-mean method. The current filtered South Asia data ends in October 2016, so its future-dated values are stale-data seasonal references—not a reliable current forecast or hazard prediction.
+
+### 5. Seasonal clustering of countries
+
+For countries with at least 12 dated records, the script converts seasonal event counts into within-country proportions and applies K-means to the four-season profiles. It compares eligible cluster counts using the silhouette score and saves each country's seasonal shares and cluster assignment. Countries with too few records are excluded; the resulting groups are exploratory and depend on this filtered dataset.
+
+### 6. Spatial clustering
+
+K-means and agglomerative hierarchical clustering are applied to event latitude and longitude across the selected South Asian countries, using **three clusters** for comparison. The longitude/latitude scatter plot uses the full South Asia viewport and a discrete colorbar for K-means cluster IDs. It is a coordinate plot rather than a political-boundary basemap, and the colors indicate group membership—not hazard severity. Silhouette scores are descriptive separation measures, not indicators of hazard.
 
 The clusters are **descriptive groupings of recorded coordinates**, not validated hazard zones or predictions of future events.
 
-### 5. Fatality classification
+### 7. Fatality classification
 
 The script uses a stratified train/test split and compares:
 
@@ -117,9 +115,24 @@ The script uses a stratified train/test split and compares:
 
 Reported metrics include accuracy, fatal-class precision, fatal-class recall, fatal-class F1-score, ROC-AUC, and a confusion matrix. Recall is highlighted because missed fatal events are important to examine; however, no model output should be used as a real-world warning without rigorous validation.
 
-### 6. Evaluation and visualization
+### 8. Evaluation and visualization
 
-The pipeline prints model-level classification reports and a comparison table, then saves a spatial cluster visualization and ROC curves. It also exports the cleaned analysis data for further review.
+The pipeline prints model-level classification reports and a comparison table, then saves temporal, seasonal, and spatial visualizations plus ROC curves. It also exports the cleaned data, monthly forecast, and country seasonal profiles.
+
+## 📄 Illustrative experiment
+
+The current catalog run retains **1,845** South Asian rainfall-triggered event records. Fatality counts are unknown for 345 records, so the classification uses the remaining **1,500 known labels** and an 80/20 stratified random split (seed 42). On the 300-event test set:
+
+| Classifier | Fatal recall | Fatal F1 | ROC-AUC |
+| --- | ---: | ---: | ---: |
+| Logistic regression | 0.4750 | 0.5044 | 0.6094 |
+| Decision tree | **0.5333** | **0.5289** | 0.6413 |
+| k-NN | 0.4667 | 0.5185 | **0.6775** |
+| Gaussian Naive Bayes | 0.1500 | 0.2400 | 0.6207 |
+
+With three coordinate clusters, the silhouette scores are **0.6070** for K-means and **0.5728** for agglomerative clustering. These results describe one random split and one coordinate representation. They are illustrative only; they do not establish which model generalizes best to new years or regions.
+
+The [survey article](LANDSLIDE_ML_SURVEY.md) gives the complete experiment protocol, results, interpretation, limitations, and references.
 
 ## 🧮 Mathematical methods and calculations
 
@@ -171,7 +184,7 @@ center latitude  = sum of latitudes / number of events
 center longitude = sum of longitudes / number of events
 ```
 
-The script tries 2, 3, 4, 5, and 6 clusters. It chooses the group count with the best average silhouette score.
+The spatial analysis uses three clusters to provide a consistent South Asia-wide view. The silhouette score describes how well-separated the chosen clusters are; it does not establish landslide risk.
 
 **Simple example:** If two events are at `(15, 75)` and `(16, 76)`, their average center is:
 
@@ -276,13 +289,16 @@ Running the script from the project directory creates or updates:
 
 | Output | Description |
 | --- | --- |
+| `landslide_monthly_forecast.png` | Monthly catalog counts, holdout baseline, and historical seasonal-average projection for future dates |
+| `landslide_monthly_forecast.csv` | Future 12-month historical seasonal-mean projections, with latest data month and method |
+| `landslide_seasonal_country_clusters.png` | Heatmap of country-level seasonal event shares |
+| `country_seasonal_clusters.csv` | Seasonal shares, event counts, and cluster labels by country |
 | `landslide_spatial_clusters.png` | Scatter plot of coordinate clusters and centers |
 | `roc_curves.png` | ROC curves comparing classifier discrimination |
+| `classification_metrics.csv` | Numeric accuracy, precision, recall, F1, and ROC-AUC for each classifier |
 | `processed_landslide_data.csv` | Filtered and processed records, including derived fields |
 
 Outputs are written relative to the current working directory.
-
-The figures shown in [Project visuals](#-project-visuals) are the corresponding image files. They are tracked separately from the README, so retain those PNG files alongside this document for the images to display in a repository.
 
 ## 🚀 Quick start
 
@@ -317,8 +333,13 @@ To use the real-data path, place `Global_Landslide_Catalog_Export_rows.csv` in t
 .
 ├── run_landslide_analysis.py          # Analysis pipeline
 ├── Global_Landslide_Catalog_Export_rows.csv  # Optional input dataset
-├── LANDSLIDE_ANALYSIS_SUMMARY.md      # Detailed project documentation
+├── LANDSLIDE_ML_SURVEY.md             # Focused ML survey and illustrative experiment
 ├── processed_landslide_data.csv       # Generated processed data
+├── landslide_monthly_forecast.csv     # Generated seasonal-baseline forecast
+├── country_seasonal_clusters.csv      # Generated country seasonal profiles
+├── classification_metrics.csv        # Generated classifier metrics
+├── landslide_monthly_forecast.png     # Generated time-series visualization
+├── landslide_seasonal_country_clusters.png  # Generated seasonal-cluster heatmap
 ├── landslide_spatial_clusters.png     # Generated clustering plot
 └── roc_curves.png                     # Generated ROC plot
 ```
@@ -328,14 +349,17 @@ Generated files may not exist until the script has run.
 ## 🧰 Tools and methods
 
 - **Data handling:** pandas, NumPy
-- **Modeling:** scikit-learn pipelines, K-means, Logistic Regression, Decision Tree, k-NN, Gaussian Naive Bayes
+- **Modeling:** seasonal-average time-series baseline, scikit-learn pipelines, K-means, Logistic Regression, Decision Tree, k-NN, Gaussian Naive Bayes
 - **Visualization:** Matplotlib, Seaborn
 - **Evaluation:** silhouette score, precision, recall, F1-score, ROC-AUC, confusion matrix
 
 ## ⚠️ Important limitations
 
-- A missing fatality count is treated as zero by the current script; in real datasets, missing may mean **unknown**, not **no fatalities**.
+- Missing fatality counts are treated as unknown and excluded from supervised classification.
 - The synthetic fallback is generated data and cannot support conclusions about actual events.
+- Historical catalog coverage is incomplete and uneven; the monthly projection extrapolates record counts, not true landslide incidence. The local source CSV ends in September 2017 globally, and the filtered South Asia subset ends in October 2016; its future-dated estimates are stale historical seasonal references, not reliable present-day forecasts.
+- Months with zero catalog entries are treated as zero in the time series, which can reflect missing reporting rather than no events.
+- Seasonal country clusters require at least 12 dated records per country and should be treated as exploratory, especially for smaller samples.
 - Geographic bounds and trigger matching are approximate and may omit relevant events or include unrelated ones.
 - The classifier uses a random stratified split, not a time-based or location-based validation. Performance may therefore overstate how well it generalizes to future events or new regions.
 - Historical event records and available features may be incomplete, biased, or inconsistent.
@@ -351,7 +375,7 @@ The project explores themes connected to:
 
 ## 📚 More documentation
 
-See [`LANDSLIDE_ANALYSIS_SUMMARY.md`](LANDSLIDE_ANALYSIS_SUMMARY.md) for a fuller explanation of the project design and analysis stages.
+See [`LANDSLIDE_ML_SURVEY.md`](LANDSLIDE_ML_SURVEY.md) for the survey discussion, experiment protocol, results, limitations, and references.
 
 ---
 

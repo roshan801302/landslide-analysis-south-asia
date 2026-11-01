@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Landslide-Event Analysis, Spatial Clustering of Hotspots, and Fatality Classification in South Asia using Machine Learning
+Review-oriented landslide machine-learning survey and illustrative analysis.
 
-Title: Landslide-Event Analysis, Spatial Clustering of Hotspots, and Fatality Classification in South Asia using Machine Learning
-Alignment: SDG 11 (Sustainable Cities and Communities) and SDG 15 (Life on Land)
+The experiment compares fatality classifiers and coordinate-clustering methods
+on South Asian records from the Global Landslide Catalog.
 
 This script performs:
 1. Data Acquisition & Loading - NASA Global Landslide Catalog (GLC) with synthetic fallback
@@ -25,6 +25,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from matplotlib.colors import BoundaryNorm, ListedColormap
 
 from sklearn.model_selection import train_test_split
 from sklearn.impute import SimpleImputer
@@ -53,6 +54,19 @@ warnings.filterwarnings("ignore")
 # Set style for visualizations
 plt.style.use("seaborn-v0_8")
 sns.set_palette("husl")
+
+SOUTH_ASIA_COUNTRIES = (
+    'Afghanistan',
+    'Bangladesh',
+    'Bhutan',
+    'India',
+    'Maldives',
+    'Nepal',
+    'Pakistan',
+    'Sri Lanka',
+)
+SOUTH_ASIA_MAP_EXTENT = (60, 100, 0, 40)
+SPATIAL_CLUSTER_COUNT = 3
 
 
 def install_instructions():
@@ -83,12 +97,12 @@ def load_landslide_data(file_path=None):
     print("=" * 80)
     
     # Define potential file paths
+    project_dir = Path(__file__).resolve().parent
     potential_paths = [
-        file_path,
-        "/home/roshan/Pictures/ml project/Global_Landslide_Catalog_Export_rows.csv",
-        "./Global_Landslide_Catalog_Export_rows.csv",
-        "../Global_Landslide_Catalog_Export_rows.csv",
-        "data/Global_Landslide_Catalog_Export_rows.csv",
+        Path(file_path) if file_path is not None else None,
+        project_dir / "Global_Landslide_Catalog_Export_rows.csv",
+        Path.cwd() / "Global_Landslide_Catalog_Export_rows.csv",
+        project_dir / "data" / "Global_Landslide_Catalog_Export_rows.csv",
     ]
     
     df = None
@@ -104,7 +118,7 @@ def load_landslide_data(file_path=None):
     
     if df is None:
         print("\n⚠ File not found locally. Creating realistic synthetic fallback dataframe...")
-        print("This mimics NASA GLC schema for South Asian context (Western Ghats & Himalayas)")
+        print("This creates demonstration records across the South Asia analysis extent")
         df = create_synthetic_data()
         print(f"✓ Created synthetic dataset with {len(df)} records")
     
@@ -129,19 +143,16 @@ def create_synthetic_data(n_samples=1500):
     """
     np.random.seed(42)
     
-    # South Asia bounds: Western Ghats and Himalayas focus
-    # Himalayas: lat ~25-35°N, lon ~70-95°E (includes India, Nepal, Bhutan)
-    # Western Ghats: lat ~8-20°N, lon ~72-78°E (India)
-    # Also include parts of Pakistan, Bangladesh, Sri Lanka
+    # Approximate South Asian locations for pipeline demonstrations.
     
     data = []
     
     # Define regions
     regions = [
         # Western Ghats (India)
-        {'country': 'India', 'lat_range': (8, 20), 'lon_range': (72, 78), 'weight': 0.35},
+        {'country': 'India', 'lat_range': (8, 20), 'lon_range': (72, 78), 'weight': 0.32},
         # Himalayas - India
-        {'country': 'India', 'lat_range': (25, 35), 'lon_range': (75, 95), 'weight': 0.25},
+        {'country': 'India', 'lat_range': (25, 35), 'lon_range': (75, 95), 'weight': 0.24},
         # Himalayas - Nepal
         {'country': 'Nepal', 'lat_range': (26, 30), 'lon_range': (80, 88), 'weight': 0.15},
         # Himalayas - Pakistan
@@ -151,7 +162,9 @@ def create_synthetic_data(n_samples=1500):
         # Sri Lanka (highlands)
         {'country': 'Sri Lanka', 'lat_range': (6, 9), 'lon_range': (80, 81), 'weight': 0.05},
         # Bhutan
-        {'country': 'Bhutan', 'lat_range': (27, 28), 'lon_range': (89, 92), 'weight': 0.07},
+        {'country': 'Bhutan', 'lat_range': (27, 28), 'lon_range': (89, 92), 'weight': 0.06},
+        # Afghanistan
+        {'country': 'Afghanistan', 'lat_range': (29, 38), 'lon_range': (60, 75), 'weight': 0.05},
     ]
     
     # Trigger types common in South Asia
@@ -198,7 +211,7 @@ def create_synthetic_data(n_samples=1500):
 
 def filter_south_asia(df):
     """
-    Filter dataset for South Asian / Indian events focusing on Western Ghats and Himalayas.
+    Filter dataset to South Asian countries and rainfall-related events.
     
     Args:
         df (pd.DataFrame): Input dataset
@@ -207,53 +220,53 @@ def filter_south_asia(df):
         pd.DataFrame: Filtered South Asia dataset
     """
     print("\n" + "=" * 80)
-    print("FILTERING FOR SOUTH ASIA (Western Ghats & Himalayas)")
+    print("FILTERING FOR SOUTH ASIA")
     print("=" * 80)
     
-    # Define South Asian countries
-    sa_countries = ['India', 'Nepal', 'Pakistan', 'Bangladesh', 'Sri Lanka', 'Bhutan']
-    
-    # Filter by country
+    # Keep events from across South Asia rather than clipping to two subregions.
     if 'country_name' in df.columns:
-        df_filtered = df[df['country_name'].isin(sa_countries)].copy()
+        df_filtered = df[df['country_name'].isin(SOUTH_ASIA_COUNTRIES)].copy()
     else:
-        # If no country column, filter by coordinates
-        df_filtered = df.copy()
+        if {'latitude', 'longitude'}.issubset(df.columns):
+            min_lon, max_lon, min_lat, max_lat = SOUTH_ASIA_MAP_EXTENT
+            in_extent = (
+                df['latitude'].between(min_lat, max_lat)
+                & df['longitude'].between(min_lon, max_lon)
+            )
+            df_filtered = df.loc[in_extent].copy()
+        else:
+            df_filtered = df.copy()
     
     print(f"Records after country filter: {len(df_filtered)}")
-    
-    # Filter by rainfall-triggered events (as specified)
-    rainfall_triggers = ['rain', 'downpour', 'monsoon', 'continuous_rain', 'tropical_cyclone', 
-                        'snowfall_snowmelt', 'Rain', 'rainfall']
-    
-    if 'landslide_trigger' in df.columns:
-        # Create mask for rainfall triggers
-        trigger_mask = df_filtered['landslide_trigger'].str.lower().isin(
-            [t.lower() for t in rainfall_triggers]
-        ) if df_filtered['landslide_trigger'].dtype == 'object' else False
-        
-        # Also include if contains 'rain' or 'monsoon'
-        rain_mask = df_filtered['landslide_trigger'].str.lower().str.contains('rain|monsoon|downpour|cyclone', 
-                                                                              na=False) if df_filtered['landslide_trigger'].dtype == 'object' else False
-        df_filtered = df_filtered[trigger_mask | rain_mask].copy()
-        print(f"Records after rainfall trigger filter: {len(df_filtered)}")
-    
-    # Focus on Western Ghats and Himalayan bounds
-    if 'latitude' in df.columns and 'longitude' in df.columns:
-        # Western Ghats: lat ~8-20°N, lon ~72-78°E
-        # Himalayas: lat ~25-36°N, lon ~70-95°E
-        wg_mask = (df_filtered['latitude'].between(8, 20)) & (df_filtered['longitude'].between(72, 78))
-        him_mask = (df_filtered['latitude'].between(25, 36)) & (df_filtered['longitude'].between(70, 95))
-        combined_mask = wg_mask | him_mask
-        df_filtered = df_filtered[combined_mask].copy()
-        print(f"Records after Western Ghats & Himalayas bounds filter: {len(df_filtered)}")
-    
-    if len(df_filtered) == 0:
-        print("\n⚠ No records after filtering. Using all South Asian records from original subset.")
-        df_filtered = df[df['country_name'].isin(sa_countries)].copy() if 'country_name' in df.columns else df.copy()
-    
+
+    if 'landslide_trigger' in df_filtered.columns:
+        triggers = df_filtered['landslide_trigger'].astype('string').str.strip().str.lower()
+        rainfall_triggers = {
+            'rain',
+            'downpour',
+            'monsoon',
+            'continuous_rain',
+            'tropical_cyclone',
+            'snowfall_snowmelt',
+            'rainfall',
+        }
+        rainfall_mask = triggers.isin(rainfall_triggers) | triggers.str.contains(
+            r'rain|monsoon|downpour|cyclone', na=False
+        )
+        rainfall_events = df_filtered.loc[rainfall_mask].copy()
+        print(f"Records after rainfall trigger filter: {len(rainfall_events)}")
+
+        if rainfall_events.empty and not df_filtered.empty:
+            print(
+                "\n⚠ No rainfall-triggered South Asian events found. "
+                "Using all South Asian catalog events."
+            )
+        else:
+            df_filtered = rainfall_events
+
     print(f"✓ Final filtered dataset: {len(df_filtered)} records")
-    print(f"  - Countries: {df_filtered['country_name'].value_counts().to_dict()}")
+    if 'country_name' in df_filtered.columns:
+        print(f"  - Countries: {df_filtered['country_name'].value_counts().to_dict()}")
     
     return df_filtered
 
@@ -289,10 +302,14 @@ def clean_and_preprocess(df):
         df_clean.dropna(subset=['latitude', 'longitude'], inplace=True)
         print(f"  ✓ Dropped {before - len(df_clean)} rows with missing coordinates")
     
-    # Fill missing fatality_count with 0
+    # Keep unknown fatality labels missing; absence of a report is not evidence
+    # that an event had zero fatalities.
     if 'fatality_count' in df_clean.columns:
-        df_clean['fatality_count'] = pd.to_numeric(df_clean['fatality_count'], errors='coerce').fillna(0)
-        print(f"  ✓ Filled missing fatalities with 0")
+        df_clean['fatality_count'] = pd.to_numeric(
+            df_clean['fatality_count'], errors='coerce'
+        )
+        unknown_fatalities = int(df_clean['fatality_count'].isna().sum())
+        print(f"  ✓ Kept {unknown_fatalities} missing fatality counts as unknown")
     
     # Fill missing trigger with 'unknown'
     if 'landslide_trigger' in df_clean.columns:
@@ -301,10 +318,15 @@ def clean_and_preprocess(df):
     
     # Create binary target column for classification: fatal_class = 1 if fatalities > 0, else 0
     print("\nCreating target variable...")
-    df_clean['fatal_class'] = (df_clean['fatality_count'] > 0).astype(int)
-    class_dist = df_clean['fatal_class'].value_counts()
-    print(f"  - Fatal (1): {class_dist.get(1, 0)} ({class_dist.get(1, 0)/len(df_clean)*100:.2f}%)")
-    print(f"  - Non-fatal (0): {class_dist.get(0, 0)} ({class_dist.get(0, 0)/len(df_clean)*100:.2f}%)")
+    known_fatality = df_clean['fatality_count'].notna()
+    df_clean['fatal_class'] = (
+        df_clean['fatality_count'].gt(0).astype(float).where(known_fatality)
+    )
+    class_dist = df_clean.loc[known_fatality, 'fatal_class'].value_counts()
+    known_count = int(known_fatality.sum())
+    print(f"  - Fatal (1): {class_dist.get(1, 0)}")
+    print(f"  - Non-fatal (0): {class_dist.get(0, 0)}")
+    print(f"  - Known fatality labels: {known_count} of {len(df_clean)} events")
     
     # Extract temporal features (month, season) from dates
     print("\nExtracting temporal features...")
@@ -365,11 +387,13 @@ def clean_and_preprocess(df):
     if 'landslide_trigger' in df_clean.columns:
         feature_cols.append('landslide_trigger')
     
-    X_class = df_clean[feature_cols].copy()
-    y_class = df_clean['fatal_class'].copy()
+    labeled_events = df_clean['fatal_class'].notna()
+    X_class = df_clean.loc[labeled_events, feature_cols].copy()
+    y_class = df_clean.loc[labeled_events, 'fatal_class'].astype(int).copy()
     
     print(f"  - Clustering features: {list(X_cluster.columns)}")
     print(f"  - Classification features: {list(X_class.columns)}")
+    print(f"  - Labeled events used for classification: {len(X_class)}")
     
     # Build scikit-learn Pipeline for classification (median imputation, scaling, one-hot encoding)
     print("\nBuilding preprocessing pipeline to prevent data leakage...")
@@ -406,7 +430,201 @@ def clean_and_preprocess(df):
     return df_clean, X_cluster, X_class, y_class, preprocessor
 
 
-def perform_spatial_clustering(X_cluster, df_clean, save_plot=True):
+def perform_temporal_analysis(df_clean, forecast_horizon=12, save_plot=True):
+    """Project future monthly catalog counts using historical calendar-month means."""
+    print("\n" + "=" * 80)
+    print("3. MONTHLY LANDSLIDE TRENDS & SEASONAL FORECAST")
+    print("=" * 80)
+
+    if 'event_date_parsed' not in df_clean.columns:
+        print("⚠ Event dates are unavailable; skipping temporal analysis.")
+        return None
+
+    event_dates = df_clean['event_date_parsed'].dropna()
+    if len(event_dates) == 0:
+        print("⚠ No valid event dates; skipping temporal analysis.")
+        return None
+
+    monthly_counts = (
+        df_clean.dropna(subset=['event_date_parsed'])
+        .set_index('event_date_parsed')
+        .resample('MS')
+        .size()
+    )
+    monthly_counts = monthly_counts.reindex(
+        pd.date_range(monthly_counts.index.min(), monthly_counts.index.max(), freq='MS'),
+        fill_value=0,
+    )
+
+    if len(monthly_counts) < 24:
+        print("⚠ At least 24 monthly observations are needed for a one-year holdout.")
+        return None
+
+    train = monthly_counts.iloc[:-12]
+    test = monthly_counts.iloc[-12:]
+    training_seasonal_means = train.groupby(train.index.month).mean()
+    validation_forecast = pd.Series(
+        [training_seasonal_means.get(month, train.mean()) for month in test.index.month],
+        index=test.index,
+    )
+    mae = float(np.mean(np.abs(test.to_numpy() - validation_forecast.to_numpy())))
+    rmse = float(np.sqrt(np.mean((test.to_numpy() - validation_forecast.to_numpy()) ** 2)))
+    print(f"Recorded-event coverage: {monthly_counts.index.min():%Y-%m} to {monthly_counts.index.max():%Y-%m}")
+    print(f"Chronological holdout: {test.index.min():%Y-%m} to {test.index.max():%Y-%m}")
+    print(f"Seasonal-month baseline | MAE: {mae:.2f} events/month | RMSE: {rmse:.2f}")
+
+    seasonal_means = monthly_counts.groupby(monthly_counts.index.month).mean()
+    last_observed_month = monthly_counts.index.max()
+    current_month = pd.Timestamp.now().to_period('M').to_timestamp()
+    forecast_anchor = max(last_observed_month, current_month)
+    forecast_dates = pd.date_range(
+        forecast_anchor + pd.offsets.MonthBegin(1),
+        periods=forecast_horizon,
+        freq='MS',
+    )
+    forecast = pd.DataFrame({
+        'month': forecast_dates,
+        'forecast_recorded_events': [
+            float(seasonal_means.get(month, monthly_counts.mean()))
+            for month in forecast_dates.month
+        ],
+        'latest_observed_month': last_observed_month,
+        'forecast_basis': 'historical_calendar_month_mean',
+    })
+    forecast.to_csv('landslide_monthly_forecast.csv', index=False)
+    print(
+        f"✓ Saved future forecast for {forecast_dates.min():%Y-%m} to "
+        f"{forecast_dates.max():%Y-%m} to landslide_monthly_forecast.csv"
+    )
+    months_since_observation = (
+        current_month.to_period('M') - last_observed_month.to_period('M')
+    ).n
+    if months_since_observation > 12:
+        print(
+            f"⚠ Latest catalog month is {last_observed_month:%Y-%m} "
+            f"({months_since_observation} months before the current month). "
+            "Future values are historical seasonal averages, not a reliable "
+            "current landslide-hazard forecast."
+        )
+
+    if save_plot:
+        plt.figure(figsize=(13, 6))
+        plt.plot(monthly_counts.index, monthly_counts.values, color='#5470c6',
+                 alpha=0.65, label='Recorded events per month')
+        plt.plot(monthly_counts.index, monthly_counts.rolling(12, min_periods=1).mean(),
+                 color='#2f855a', linewidth=2, label='Trailing 12-month average')
+        plt.plot(test.index, validation_forecast.values, color='#ed8936',
+                 linestyle='--', linewidth=2, label='Holdout seasonal baseline')
+        plt.plot(forecast['month'], forecast['forecast_recorded_events'],
+                 color='#c53030', marker='o', linestyle='--',
+                 label=f'Future {forecast_horizon} months: historical seasonal baseline')
+        plt.axvline(last_observed_month, color='gray', linestyle=':', linewidth=1,
+                    label='Latest observed catalog month')
+        plt.title('Historical Monthly Records and Future Seasonal-Baseline Projection')
+        plt.xlabel('Month')
+        plt.ylabel('Recorded events')
+        plt.grid(True, alpha=0.25)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig('landslide_monthly_forecast.png', dpi=300, bbox_inches='tight')
+        plt.close()
+        print("✓ Saved temporal analysis plot to landslide_monthly_forecast.png")
+
+    return {
+        'monthly_counts': monthly_counts,
+        'validation_mae': mae,
+        'validation_rmse': rmse,
+        'forecast': forecast,
+    }
+
+
+def perform_seasonal_country_clustering(df_clean, min_events=12, save_plot=True):
+    """Cluster countries by their normalized seasonal distribution of recorded events."""
+    print("\n" + "=" * 80)
+    print("4. SEASONAL CLUSTERING OF SOURCE COUNTRIES")
+    print("=" * 80)
+
+    required = {'country_name', 'season'}
+    if not required.issubset(df_clean.columns):
+        print("⚠ Country or season fields are unavailable; skipping seasonal clustering.")
+        return None
+
+    seasons = ['winter', 'spring', 'monsoon', 'post_monsoon']
+    valid = df_clean.loc[
+        df_clean['season'].isin(seasons) & df_clean['country_name'].notna()
+    ].copy()
+    valid['country_name'] = valid['country_name'].astype(str).str.strip()
+    valid = valid[valid['country_name'].ne('')]
+    counts = valid.groupby('country_name').size()
+    eligible_countries = counts[counts >= min_events].index
+    valid = valid[valid['country_name'].isin(eligible_countries)]
+
+    if valid['country_name'].nunique() < 3:
+        print(f"⚠ Fewer than three countries have at least {min_events} dated events; skipping clustering.")
+        return None
+
+    seasonal_counts = (
+        valid.groupby(['country_name', 'season'])
+        .size()
+        .unstack(fill_value=0)
+        .reindex(columns=seasons, fill_value=0)
+    )
+    seasonal_profiles = seasonal_counts.div(seasonal_counts.sum(axis=1), axis=0)
+    unique_profiles = seasonal_profiles.drop_duplicates().shape[0]
+    max_k = min(5, len(seasonal_profiles) - 1, unique_profiles)
+    if max_k < 2:
+        print("⚠ Country seasonal profiles do not contain enough distinct patterns to cluster.")
+        return None
+
+    silhouette_scores = {}
+    for k in range(2, max_k + 1):
+        labels = KMeans(n_clusters=k, random_state=42, n_init=10).fit_predict(seasonal_profiles)
+        silhouette_scores[k] = silhouette_score(seasonal_profiles, labels)
+    optimal_k = max(silhouette_scores, key=silhouette_scores.get)
+    labels = KMeans(n_clusters=optimal_k, random_state=42, n_init=10).fit_predict(seasonal_profiles)
+
+    result = seasonal_profiles.mul(100).round(2)
+    result.insert(0, 'event_count', seasonal_counts.sum(axis=1))
+    result['seasonal_cluster'] = labels
+    result.index.name = 'country_name'
+    result = result.sort_values(['seasonal_cluster', 'country_name'])
+    result.to_csv('country_seasonal_clusters.csv')
+
+    print(f"Eligible countries: {len(result)} (minimum {min_events} dated events each)")
+    print(f"Selected k={optimal_k} (silhouette score {silhouette_scores[optimal_k]:.3f})")
+    print(result.to_string())
+    print("✓ Saved seasonal country profiles to country_seasonal_clusters.csv")
+
+    if save_plot:
+        profile_columns = seasons
+        plot_data = result[profile_columns]
+        plt.figure(figsize=(10, max(4, 0.6 * len(plot_data))))
+        sns.heatmap(
+            plot_data,
+            annot=True,
+            fmt='.1f',
+            cmap='YlOrRd',
+            vmin=0,
+            vmax=100,
+            cbar_kws={'label': 'Share of country events (%)'},
+        )
+        plt.title(f'Seasonal Distribution of Landslide Records by Country (k={optimal_k})')
+        plt.xlabel('Season')
+        plt.ylabel('Country')
+        plt.tight_layout()
+        plt.savefig('landslide_seasonal_country_clusters.png', dpi=300, bbox_inches='tight')
+        plt.close()
+        print("✓ Saved seasonal clustering plot to landslide_seasonal_country_clusters.png")
+
+    return result
+
+
+def perform_spatial_clustering(
+    X_cluster,
+    df_clean,
+    save_plot=True,
+    n_clusters=SPATIAL_CLUSTER_COUNT,
+):
     """
     Perform unsupervised spatial clustering for hotspot identification.
     
@@ -416,76 +634,105 @@ def perform_spatial_clustering(X_cluster, df_clean, save_plot=True):
         save_plot (bool): Whether to save the plot
     
     Returns:
-        tuple: (kmeans_model, cluster_labels, optimal_k)
+        tuple: (kmeans_model, cluster_labels, cluster_count, silhouette_scores)
     """
     print("\n" + "=" * 80)
-    print("3. UNSUPERVISED SPATIAL CLUSTERING (HOTSPOT IDENTIFICATION)")
+    print("5. UNSUPERVISED SPATIAL CLUSTERING (HOTSPOT IDENTIFICATION)")
     print("=" * 80)
     
     if len(X_cluster) < 2:
         print("⚠ Insufficient data for clustering")
-        return None, np.array([]), 2
-    
-    # Evaluate silhouette scores for k = 2 to 6
-    print("Evaluating Silhouette Score for k = 2 to 6...")
-    silhouette_scores = []
-    k_range = range(2, 7)  # k from 2 to 6
-    
-    for k in k_range:
-        kmeans = KMeans(n_clusters=k, random_state=42, n_init=10)
-        cluster_labels_k = kmeans.fit_predict(X_cluster)
-        sil_score = silhouette_score(X_cluster, cluster_labels_k)
-        silhouette_scores.append(sil_score)
-        print(f"  k={k}: Silhouette Score = {sil_score:.4f}")
-    
-    # Find optimal k
-    optimal_k = k_range[np.argmax(silhouette_scores)]
-    max_score = max(silhouette_scores)
-    
-    print(f"\n✓ Optimal k determined: k={optimal_k} (Silhouette Score = {max_score:.4f})")
-    print("  This helps separate hazard zones (Himalayan belt vs Western Ghats)")
-    
-    # Perform final clustering with optimal k
-    print(f"\nPerforming K-means clustering with k={optimal_k}...")
-    kmeans_final = KMeans(n_clusters=optimal_k, random_state=42, n_init=10)
+        return None, np.array([]), 2, []
+
+    unique_locations = X_cluster.drop_duplicates().shape[0]
+    cluster_count = min(n_clusters, unique_locations)
+    if cluster_count < 2:
+        print("⚠ Insufficient unique locations for clustering")
+        return None, np.array([]), cluster_count, []
+
+    print(f"Clustering South Asian locations with K-means (k={cluster_count})...")
+    kmeans_final = KMeans(n_clusters=cluster_count, random_state=42, n_init=10)
     cluster_labels = kmeans_final.fit_predict(X_cluster)
-    
-    # Also try hierarchical clustering for comparison
+
+    silhouette_scores = [silhouette_score(X_cluster, cluster_labels)]
+    print(f"  Silhouette Score (k={cluster_count}): {silhouette_scores[0]:.4f}")
+
     print("\nPerforming Hierarchical Clustering (Agglomerative) for comparison...")
-    hier = AgglomerativeClustering(n_clusters=optimal_k)
+    hier = AgglomerativeClustering(n_clusters=cluster_count)
     hier_labels = hier.fit_predict(X_cluster)
     hier_sil = silhouette_score(X_cluster, hier_labels)
-    print(f"  Hierarchical Clustering Silhouette Score (k={optimal_k}): {hier_sil:.4f}")
+    print(f"  Hierarchical Clustering Silhouette Score (k={cluster_count}): {hier_sil:.4f}")
     
     # Add labels to dataframe
     df_clean['cluster_kmeans'] = cluster_labels
     df_clean['cluster_hierarchical'] = hier_labels
     
-    # Generate and save scatter plot
+    # Use discrete colors and ticks because cluster IDs are categories, not values.
     if save_plot:
         print("\nGenerating spatial cluster visualization...")
-        plt.figure(figsize=(12, 10))
-        scatter = plt.scatter(X_cluster['longitude'], X_cluster['latitude'], 
-                             c=cluster_labels, cmap='tab10', s=50, alpha=0.6, edgecolors='black')
-        plt.colorbar(scatter, label='Cluster')
-        plt.xlabel('Longitude', fontsize=12)
-        plt.ylabel('Latitude', fontsize=12)
-        plt.title(f'Spatial Clustering of Landslide Hotspots (K-means, k={optimal_k})\nSouth Asia: Western Ghats & Himalayas', 
-                  fontsize=14, fontweight='bold')
-        plt.grid(True, alpha=0.3)
-        
-        # Add region annotations
-        plt.text(75, 15, 'Western Ghats', fontsize=10, style='italic', bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
-        plt.text(82, 30, 'Himalayas', fontsize=10, style='italic', bbox=dict(boxstyle='round', facecolor='white', alpha=0.7))
-        
+        fig, ax = plt.subplots(figsize=(10, 7))
+        colors = plt.get_cmap('tab10').colors[:cluster_count]
+        cluster_cmap = ListedColormap(colors)
+        cluster_norm = BoundaryNorm(
+            np.arange(-0.5, cluster_count + 0.5, 1),
+            cluster_cmap.N,
+        )
+        points = ax.scatter(
+            X_cluster['longitude'],
+            X_cluster['latitude'],
+            c=cluster_labels,
+            cmap=cluster_cmap,
+            norm=cluster_norm,
+            s=34,
+            alpha=0.8,
+            edgecolors='black',
+            linewidths=0.25,
+        )
+        colorbar = fig.colorbar(
+            points,
+            ax=ax,
+            ticks=np.arange(cluster_count),
+            boundaries=np.arange(-0.5, cluster_count + 0.5, 1),
+            spacing='uniform',
+        )
+        colorbar.set_ticklabels(
+            [f'Cluster {cluster_id + 1}' for cluster_id in range(cluster_count)]
+        )
+        colorbar.set_label('Cluster')
+        min_lon, max_lon, min_lat, max_lat = SOUTH_ASIA_MAP_EXTENT
+        ax.set_xlim(min_lon, max_lon)
+        ax.set_ylim(min_lat, max_lat)
+        ax.set_aspect(1 / np.cos(np.deg2rad(20)))
+        annotation_style = {
+            'fontsize': 9,
+            'style': 'italic',
+            'bbox': {
+                'boxstyle': 'round,pad=0.25',
+                'facecolor': 'white',
+                'alpha': 0.8,
+            },
+        }
+        ax.text(72.5, 15, 'Western Ghats', **annotation_style)
+        ax.text(82, 30, 'Himalayas', **annotation_style)
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        ax.set_title(
+            f'Spatial Clustering of Landslide Hotspots (K-means, k={cluster_count})\n'
+            'South Asia',
+            fontsize=14,
+            fontweight='bold',
+        )
+        ax.grid(True, alpha=0.3)
+
+        fig.tight_layout()
         plot_path = 'landslide_spatial_clusters.png'
-        plt.savefig(plot_path, dpi=300, bbox_inches='tight')
+        fig.savefig(plot_path, dpi=240, bbox_inches='tight')
         print(f"✓ Saved cluster plot to: {plot_path}")
-        plt.close()
+        plt.close(fig)
     
     # Cluster statistics
     print("\nCluster Statistics (K-means):")
-    for i in range(optimal_k):
+    for i in range(cluster_count):
         cluster_mask = cluster_labels == i
         n_points = cluster_mask.sum()
         mean_lat = X_cluster[cluster_mask]['latitude'].mean()
@@ -494,7 +741,7 @@ def perform_spatial_clustering(X_cluster, df_clean, save_plot=True):
         fatal_events = df_clean[cluster_mask]['fatal_class'].sum()
         print(f"  Cluster {i}: {n_points} events | Center: ({mean_lat:.2f}, {mean_lon:.2f}) | Total fatalities: {fatalities} | Fatal events: {fatal_events}")
     
-    return kmeans_final, cluster_labels, optimal_k, silhouette_scores
+    return kmeans_final, cluster_labels, cluster_count, silhouette_scores
 
 
 def train_classification_models(X, y, preprocessor, test_size=0.2, random_state=42):
@@ -512,7 +759,7 @@ def train_classification_models(X, y, preprocessor, test_size=0.2, random_state=
         dict: Dictionary containing trained models, predictions, and metrics
     """
     print("\n" + "=" * 80)
-    print("4. SUPERVISED CLASSIFICATION (FATAL VS. NON-FATAL)")
+    print("6. SUPERVISED CLASSIFICATION (FATAL VS. NON-FATAL)")
     print("=" * 80)
     
     # Split data chronologically or via train_test_split (80/20) as specified
@@ -636,7 +883,7 @@ def evaluate_and_report(results, y_test, X_test):
         X_test (pd.DataFrame): Test features
     """
     print("\n" + "=" * 80)
-    print("5. EVALUATION & REPORTING")
+    print("7. EVALUATION & REPORTING")
     print("=" * 80)
     
     print("\n⚠ IMPORTANT: Since missing a fatal landslide is dangerous,")
@@ -662,15 +909,24 @@ def evaluate_and_report(results, y_test, X_test):
     for name, res in results.items():
         comparison_data.append({
             'Model': name,
-            'Accuracy': f"{res['accuracy']:.4f}",
-            'Precision (Fatal)': f"{res['precision']:.4f}",
-            'Recall (Fatal)': f"{res['recall']:.4f}",
-            'F1-Score (Fatal)': f"{res['f1']:.4f}",
-            'ROC-AUC': f"{res['roc_auc']:.4f}",
+            'Accuracy': res['accuracy'],
+            'Precision (Fatal)': res['precision'],
+            'Recall (Fatal)': res['recall'],
+            'F1-Score (Fatal)': res['f1'],
+            'ROC-AUC': res['roc_auc'],
         })
     
     comparison_df = pd.DataFrame(comparison_data)
-    print(comparison_df.to_string(index=False))
+    comparison_df.to_csv('classification_metrics.csv', index=False)
+    print(comparison_df.to_string(
+        index=False,
+        formatters={
+            column: '{:.4f}'.format
+            for column in comparison_df.columns
+            if column != 'Model'
+        },
+    ))
+    print("✓ Saved classifier metrics to classification_metrics.csv")
     
     # Find best model by recall (critical for fatal landslides)
     best_recall_idx = np.argmax([r['recall'] for r in results.values()])
@@ -697,7 +953,7 @@ def main():
     # Print banner
     print("=" * 80)
     print("LANDSLIDE-EVENT ANALYSIS, SPATIAL CLUSTERING & FATALITY CLASSIFICATION")
-    print("South Asia - Western Ghats & Himalayas")
+    print("South Asia - illustrative fatality classification and coordinate clustering")
     print(f"Execution started: {start_time}")
     print("=" * 80)
     
@@ -718,18 +974,20 @@ def main():
             print("\n✗ No data available after preprocessing. Exiting.")
             sys.exit(1)
         
-        # 3. Unsupervised Spatial Clustering
-        clustering_results = perform_spatial_clustering(X_cluster, df_clean)
-        if clustering_results:
-            kmeans_final, cluster_labels, optimal_k, silhouette_scores = clustering_results
+        # 3–4. Temporal trend forecasting and seasonal country clustering
+        perform_temporal_analysis(df_clean)
+        perform_seasonal_country_clustering(df_clean)
+
+        # 5. Unsupervised Spatial Clustering
+        perform_spatial_clustering(X_cluster, df_clean)
         
-        # 4. Supervised Classification
+        # 6. Supervised Classification
         results, X_test, y_test = train_classification_models(X_class, y_class, preprocessor)
         
         # Plot ROC curves
         plot_roc_curves(results, y_test)
         
-        # 5. Evaluation & Reporting
+        # 7. Evaluation & Reporting
         evaluate_and_report(results, y_test, X_test)
         
         # Save processed data
@@ -743,6 +1001,11 @@ def main():
         print(f"\n✓ Analysis completed successfully in {duration}")
         print("=" * 80)
         print("Generated files:")
+        print("  - landslide_monthly_forecast.png (Monthly counts and seasonal baseline)")
+        print("  - landslide_monthly_forecast.csv (12-month exploratory forecast)")
+        print("  - landslide_seasonal_country_clusters.png (Country seasonal profiles)")
+        print("  - country_seasonal_clusters.csv (Country seasonal cluster assignments)")
+        print("  - classification_metrics.csv (Fatality classifier comparison)")
         print("  - landslide_spatial_clusters.png (Spatial clustering visualization)")
         print("  - roc_curves.png (ROC curves for all models)")
         print("  - processed_landslide_data.csv (Cleaned processed data)")
