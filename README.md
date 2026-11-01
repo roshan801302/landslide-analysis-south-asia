@@ -1,3 +1,5 @@
+<a id="top"></a>
+
 <div align="center">
 
 # 🌧️ Machine Learning for Landslides
@@ -355,6 +357,7 @@ Generated files may not exist until the script has run.
 - **Visualization:** Matplotlib, Seaborn
 - **Evaluation:** silhouette score, precision, recall, F1-score, ROC-AUC, confusion matrix
 
+<a id="important-limitations"></a>
 ## ⚠️ Important limitations
 
 - Missing fatality counts are treated as unknown and excluded from supervised classification.
@@ -368,6 +371,8 @@ Generated files may not exist until the script has run.
 - Reported fatality counts and trigger metadata are frequently incomplete, inconsistently coded, or under-reported across sources, so the fatal/non-fatal target may carry measurement error and understate true human impacts.
 - Clustering results depend on the input records and chosen method; they do not establish causal factors or forecast future landslides.
 - This project has not been established as a safety-critical decision tool.
+
+[Back to top](#top)
 
 ## 🌱 Research alignment
 
